@@ -1,0 +1,117 @@
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+from sklearn.model_selection import train_test_split, GridSearchCV, cross_val_score
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LinearRegression
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_squared_error, r2_score
+
+# Upload dataset housing.csv dari lokal
+from google.colab import files
+uploaded = files.upload()
+
+# Load dataset
+df = pd.read_csv("housing.csv")
+
+# Exploratory Data Analysis
+print(df.head())
+print(df.info())
+print(df.describe())
+
+# Cek missing value
+print("Missing values:\n", df.isnull().sum())
+
+# Correlation heatmap
+plt.figure(figsize=(12, 10))
+sns.heatmap(df.corr(), annot=True, fmt=".2f", cmap="coolwarm", square=True)
+plt.title("Correlation Matrix for Boston Housing")
+plt.show()
+
+# Split data
+X = df.drop("MEDV", axis=1)
+y = df["MEDV"]
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Feature scaling
+scaler = StandardScaler()
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
+
+# === Linear Regression ===
+lin_reg = LinearRegression()
+lin_reg.fit(X_train_scaled, y_train)
+y_pred_lin = lin_reg.predict(X_test_scaled)
+
+mse_lin = mean_squared_error(y_test, y_pred_lin)
+r2_lin = r2_score(y_test, y_pred_lin)
+
+print("Linear Regression MSE:", mse_lin)
+print("Linear Regression R2 :", r2_lin)
+
+# === Random Forest Regressor ===
+rf = RandomForestRegressor(random_state=42)
+rf.fit(X_train_scaled, y_train)
+y_pred_rf = rf.predict(X_test_scaled)
+
+mse_rf = mean_squared_error(y_test, y_pred_rf)
+r2_rf = r2_score(y_test, y_pred_rf)
+
+print("Random Forest MSE:", mse_rf)
+print("Random Forest R2 :", r2_rf)
+
+# === Plot Actual vs Predicted ===
+plt.figure(figsize=(14, 6))
+
+# Linear Regression
+plt.subplot(1, 2, 1)
+plt.scatter(y_test, y_pred_lin, alpha=0.6)
+plt.plot([y.min(), y.max()], [y.min(), y.max()], 'r--')
+plt.title("Linear Regression\nActual vs Predicted")
+plt.xlabel("Actual MEDV")
+plt.ylabel("Predicted MEDV")
+
+# Random Forest
+plt.subplot(1, 2, 2)
+plt.scatter(y_test, y_pred_rf, alpha=0.6)
+plt.plot([y.min(), y.max()], [y.min(), y.max()], 'r--')
+plt.title("Random Forest\nActual vs Predicted")
+plt.xlabel("Actual MEDV")
+plt.ylabel("Predicted MEDV")
+
+plt.tight_layout()
+plt.show()
+
+# === GridSearch for Random Forest Tuning ===
+param_grid = {
+    'n_estimators': [50, 100],
+    'max_depth': [None, 10],
+    'min_samples_split': [2, 5],
+    'min_samples_leaf': [1, 2]
+}
+
+rf_model = RandomForestRegressor(random_state=42)
+grid_search = GridSearchCV(estimator=rf_model, param_grid=param_grid, cv=5, n_jobs=-1, scoring='neg_mean_squared_error')
+
+grid_search.fit(X_train_scaled, y_train)
+
+print("Best parameters found: ", grid_search.best_params_)
+
+# Evaluate best model
+best_rf = grid_search.best_estimator_
+y_pred_best = best_rf.predict(X_test_scaled)
+
+mse_best = mean_squared_error(y_test, y_pred_best)
+r2_best = r2_score(y_test, y_pred_best)
+
+print("Best Model Test MSE:", mse_best)
+print("Best Model Test R²:", r2_best)
+
+# === Cross-Validation ===
+cv_scores = cross_val_score(best_rf, X_train_scaled, y_train, cv=10, scoring='r2')
+print("Cross-validation R² scores:", cv_scores)
+print("Mean R² score:", cv_scores.mean())
